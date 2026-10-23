@@ -1,0 +1,134 @@
+<div id="contenedor-simon" style="all: initial; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background: #232946; padding: 25px; border-radius: 20px; max-width: 400px; margin: 20px auto; box-shadow: 0 15px 35px rgba(0,0,0,0.4); text-align: center;">
+  
+  <h2 style="color: #fffffe; margin: 0 0 20px 0; font-size: 1.5rem;">🎵 Simon Musical 🎵</h2>
+  
+  <div id="rejilla-notas" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: 100%;">
+    <button class="boton-musical" data-note="C4" style="background: #e74c3c; height: 75px; border: none; border-radius: 12px; cursor: pointer; color: white; font-weight: bold;">Do</button>
+    <button class="boton-musical" data-note="D4" style="background: #f39c12; height: 75px; border: none; border-radius: 12px; cursor: pointer; color: white; font-weight: bold;">Re</button>
+    <button class="boton-musical" data-note="E4" style="background: #f1c40f; height: 75px; border: none; border-radius: 12px; cursor: pointer; color: white; font-weight: bold;">Mi</button>
+    <button class="boton-musical" data-note="F4" style="background: #2ecc71; height: 75px; border: none; border-radius: 12px; cursor: pointer; color: white; font-weight: bold;">Fa</button>
+    <button class="boton-musical" data-note="G4" style="background: #1abc9c; height: 75px; border: none; border-radius: 12px; cursor: pointer; color: white; font-weight: bold;">Sol</button>
+    <button class="boton-musical" data-note="A4" style="background: #3498db; height: 75px; border: none; border-radius: 12px; cursor: pointer; color: white; font-weight: bold;">La</button>
+    <button class="boton-musical" data-note="B4" style="background: #9b59b6; height: 75px; border: none; border-radius: 12px; cursor: pointer; color: white; font-weight: bold;">Si</button>
+    <button class="boton-musical" data-note="C5" style="background: #e91e63; height: 75px; border: none; border-radius: 12px; cursor: pointer; color: white; font-weight: bold;">Do</button>
+  </div>
+
+  <div style="color: #b8c1ec; margin: 20px 0; font-size: 1.1rem;">
+    Ronda: <span id="contador-ronda" style="color: #eebbc3; font-weight: bold;">0</span>
+  </div>
+
+  <button id="boton-inicio" style="background: #eebbc3; color: #232946; border: none; padding: 12px 30px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 1rem;">▶️ COMENÇAR JOC</button>
+
+  <style>
+    .boton-musical.iluminado {
+      filter: brightness(2.2) !important;
+      transform: scale(1.1);
+      box-shadow: 0 0 15px white !important;
+      transition: 0.1s;
+    }
+  </style>
+
+  <script>
+    (function() {
+      const botones = document.querySelectorAll('.boton-musical');
+      const txtRonda = document.getElementById('contador-ronda');
+      const btnInicio = document.getElementById('boton-inicio');
+      
+      let audioCtx = null;
+      let secuencia = [];
+      let pasosUsuario = [];
+      let bloqueado = false;
+
+      const frecuencias = {
+        C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23,
+        G4: 392.00, A4: 440.00, B4: 493.88, C5: 523.25
+      };
+
+      // FUNCIÓN CLAVE: Crea y activa el sonido
+      function sonarNota(nota) {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        
+        // Si el audio está en pausa por el navegador, lo reactivamos
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        
+        osc.type = 'triangle'; // Sonido más claro
+        osc.frequency.setValueAtTime(frecuencias[nota], audioCtx.currentTime);
+        
+        gain.gain.setValueAtTime(0, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.4, audioCtx.currentTime + 0.05); // Ataque
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4); // Desvanecimiento
+        
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.5);
+
+        // Feedback Visual
+        const btn = Array.from(botones).find(b => b.dataset.note === nota);
+        btn.classList.add('iluminado');
+        setTimeout(() => btn.classList.remove('iluminado'), 350);
+      }
+
+      function reproducirSecuencia() {
+        bloqueado = true;
+        let i = 0;
+        const intervalo = setInterval(() => {
+          sonarNota(secuencia[i]);
+          i++;
+          if (i >= secuencia.length) {
+            clearInterval(intervalo);
+            bloqueado = false;
+            pasosUsuario = [];
+          }
+        }, 800);
+      }
+
+      function manejarClick(e) {
+        if (bloqueado) return;
+        const nota = e.target.dataset.note;
+        sonarNota(nota);
+        pasosUsuario.push(nota);
+
+        const index = pasosUsuario.length - 1;
+        if (pasosUsuario[index] !== secuencia[index]) {
+          alert("¡Has fallat! Record: " + (secuencia.length - 1));
+          secuencia = [];
+          txtRonda.textContent = "0";
+          return;
+        }
+
+        if (pasosUsuario.length === secuencia.length) {
+          bloqueado = true;
+          setTimeout(() => {
+            const notasDisp = Object.keys(frecuencias);
+            secuencia.push(notasDisp[Math.floor(Math.random() * notasDisp.length)]);
+            txtRonda.textContent = secuencia.length;
+            reproducirSecuencia();
+          }, 1000);
+        }
+      }
+
+      botones.forEach(b => b.onclick = manejarClick);
+
+      btnInicio.onclick = () => {
+        // Inicializar contexto de audio al hacer click
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+
+        secuencia = [];
+        const notasDisp = Object.keys(frecuencias);
+        secuencia.push(notasDisp[Math.floor(Math.random() * notasDisp.length)]);
+        txtRonda.textContent = "1";
+        reproducirSecuencia();
+      };
+    })();
+  </script>
+</div>
